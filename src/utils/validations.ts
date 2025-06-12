@@ -25,3 +25,7 @@ export const changePasswordSchema = z.object({
     .string()
     .min(8, "Current password must be at least 8 characters long"),
 });
+
+export const resendVerifyEmailSchema = z.object({
+  email: z.string().email("Invalid email format"),
+});

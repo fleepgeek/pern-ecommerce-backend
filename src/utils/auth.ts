@@ -1,7 +1,11 @@
 import { Response } from "express";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
-export const generateTokenAndSetCookie = (res: Response, userId: string) => {
+export const generateAccessTokenAndSetCookie = (
+  res: Response,
+  userId: string
+) => {
   const token = jwt.sign({ userId }, process.env.JWT_SECRET as string, {
     expiresIn: "7d",
   });
@@ -14,4 +18,11 @@ export const generateTokenAndSetCookie = (res: Response, userId: string) => {
   });
 
   return token;
+};
+
+export const generateTokenCode = (length: number) => {
+  return crypto
+    .randomBytes(Math.ceil(length / 2))
+    .toString("hex")
+    .slice(0, length);
 };

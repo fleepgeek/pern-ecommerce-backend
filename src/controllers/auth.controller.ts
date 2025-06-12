@@ -4,49 +4,79 @@ import prisma from "../utils/db";
 import {
   changePasswordSchema,
   loginSchema,
+  resendVerifyEmailSchema,
   signupSchema,
 } from "../utils/validations";
-import { generateTokenAndSetCookie } from "../utils/auth";
+import {
+  generateAccessTokenAndSetCookie,
+  generateTokenCode,
+} from "../utils/auth";
+import {
+  sendPasswordChangeEmail,
+  sendVerificationEmail,
+  sendWelcomeEmail,
+} from "../utils/sendmail";
 
 export const signUp = async (req: Request, res: Response) => {
+  const validatedData = signupSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const { email, password, name } = validatedData.data;
+
   try {
-    const validatedData = signupSchema.safeParse(req.body);
-    if (!validatedData.success) {
-      res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: validatedData.error.issues,
-      });
-      return;
-    }
-
-    const { email, password, name } = validatedData.data;
-
+    // There's really no need of making this an atomic transaction as there are
+    // no dependent writes/updates (only one record is added ie user)
     const result = await prisma.$transaction(async (tx) => {
-      const userExists = await tx.user.findFirst({ where: { email } });
+      const userExists = await tx.user.findUnique({ where: { email } });
       if (userExists) {
-        res
-          .status(400)
-          .json({ success: false, message: "User already exists" });
-        return;
+        // Instead of throwing generic Error, throw custom error with status
+        // do this because we can't set status codes inside a transaction
+        throw { status: 409, message: "User already exists" };
       }
 
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
+
+      const verificationToken = generateTokenCode(32);
+      const verificationTokenExpiresAt = new Date(
+        Date.now() + 24 * 60 * 60 * 1000
+      ); // expires in 24hrs
 
       const user = await tx.user.create({
         data: {
           email,
           password: hashedPassword,
           name,
+          verificationToken,
+          verificationTokenExpiresAt,
         },
-        omit: { password: true, updatedAt: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          createdAt: true,
+          verificationToken: true,
+          verificationTokenExpiresAt: true,
+        },
       });
 
       return user;
     });
 
-    generateTokenAndSetCookie(res, result?.id as string);
+    generateAccessTokenAndSetCookie(res, result.id);
+
+    await sendVerificationEmail(
+      result.email,
+      result.name,
+      result.verificationToken!
+    );
 
     res.status(201).json({
       success: true,
@@ -57,7 +87,7 @@ export const signUp = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error in signUp:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || "Internal Server Error",
     });
@@ -65,20 +95,20 @@ export const signUp = async (req: Request, res: Response) => {
 };
 
 export const login = async (req: Request, res: Response) => {
+  const validatedData = loginSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const { email, password } = validatedData.data;
+
   try {
-    const validatedData = loginSchema.safeParse(req.body);
-    if (!validatedData.success) {
-      res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        error: validatedData.error.issues,
-      });
-      return;
-    }
-
-    const { email, password } = validatedData.data;
-
-    const user = await prisma.user.findFirst({
+    const user = await prisma.user.findUnique({
       where: { email },
     });
 
@@ -97,7 +127,7 @@ export const login = async (req: Request, res: Response) => {
       return;
     }
 
-    generateTokenAndSetCookie(res, user.id);
+    generateAccessTokenAndSetCookie(res, user.id);
 
     res.status(200).json({
       success: true,
@@ -118,6 +148,134 @@ export const logout = async (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: "Logout successful" });
 };
 
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const { verificationToken } = req.params;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        verificationToken,
+        verificationTokenExpiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Invalid or expired verification code. Resend an account verification request",
+      });
+      return;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        isVerified: true,
+        verificationToken: null,
+        verificationTokenExpiresAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isVerified: true,
+        createdAt: true,
+      },
+    });
+
+    await sendWelcomeEmail(user.email, user.name);
+
+    res.status(200).json({
+      success: true,
+      message: "Account Verification Successful",
+      data: { user: updatedUser },
+    });
+  } catch (error: any) {
+    console.error("Error in Account Verification:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+export const resendVerifyEmail = async (req: Request, res: Response) => {
+  const validatedData = resendVerifyEmailSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const { email } = validatedData.data;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message:
+          "User not found. Please make sure you entered the email you used to create an account.",
+      });
+      return;
+    }
+
+    if (user.isVerified) {
+      res.status(400).json({
+        success: false,
+        message: "User is already verified",
+      });
+      return;
+    }
+
+    if (
+      user.verificationTokenExpiresAt &&
+      user.verificationTokenExpiresAt > new Date()
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Verification token is still valid. Please check your email.",
+      });
+      return;
+    }
+
+    const verificationToken = generateTokenCode(32);
+    const verificationTokenExpiresAt = new Date(
+      Date.now() + 24 * 60 * 60 * 1000
+    ); // expires in 24hrs
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationToken,
+        verificationTokenExpiresAt,
+      },
+    });
+
+    await sendVerificationEmail(user.email, user.name, verificationToken);
+
+    res.status(200).json({
+      success: true,
+      message: "Verification email resent successfully",
+    });
+  } catch (error: any) {
+    console.error("Error in Resending Verification Email:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
 export const checkAuth = async (req: Request, res: Response) => {
   try {
     if (!req.userId) {
@@ -128,7 +286,7 @@ export const checkAuth = async (req: Request, res: Response) => {
       return;
     }
 
-    const user = await prisma.user.findFirst({
+    const user = await prisma.user.findUnique({
       where: { id: req.userId },
       omit: { password: true, updatedAt: true },
     });
@@ -156,20 +314,20 @@ export const checkAuth = async (req: Request, res: Response) => {
 };
 
 export const changePassword = async (req: Request, res: Response) => {
+  const validatedData = changePasswordSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const { currentPassword, newPassword } = validatedData.data;
+
   try {
-    const validatedData = changePasswordSchema.safeParse(req.body);
-    if (!validatedData.success) {
-      res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        error: validatedData.error.issues,
-      });
-      return;
-    }
-
-    const { currentPassword, newPassword } = validatedData.data;
-
-    const user = await prisma.user.findFirst({ where: { id: req.userId } });
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
     const isPasswordValid = await bcrypt.compare(
       currentPassword,
       user?.password || ""
@@ -188,6 +346,10 @@ export const changePassword = async (req: Request, res: Response) => {
       where: { id: req.userId },
       data: { password: hashedNewPassword },
     });
+
+    generateAccessTokenAndSetCookie(res, req.userId);
+
+    await sendPasswordChangeEmail(user!.email, user!.name);
 
     res
       .status(200)

@@ -19,7 +19,12 @@ app.use(cookieParser());
 
 app.use(rateLimiter);
 
+app.get("/", (req: Request, res: Response) => {
+  res.send({ success: true, message: "Welcome to MERN COMMERCE API" });
+});
+
 app.use("/v1/api/auth", authLimiter, authRouter);
+
 app.get("/v1/api/protected", authenticate, (req: Request, res: Response) => {
   res.send({ success: true, message: "Protected api" });
 });

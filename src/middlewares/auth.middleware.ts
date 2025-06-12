@@ -32,16 +32,18 @@ export const authenticate = async (
       return;
     }
 
-    const user = await prisma.user.findFirst({ where: { id: decoded.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
     if (!user) {
       res.status(401).json({ success: false, message: "Unauthorized" });
       return;
     }
-    if (!user.isActive) {
+    if (!user.isVerified) {
       //generate verification token and send verification mail
       res.status(403).json({
         success: false,
-        message: "Account not verified check your mail for verification code",
+        message: "Account not verified check your mail for verification link",
       });
       return;
     }
