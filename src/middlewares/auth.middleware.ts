@@ -37,6 +37,15 @@ export const authenticate = async (
       res.status(401).json({ success: false, message: "Unauthorized" });
       return;
     }
+    if (!user.isActive) {
+      //generate verification token and send verification mail
+      res.status(403).json({
+        success: false,
+        message: "Account not verified check your mail for verification code",
+      });
+      return;
+    }
+
     req.userId = user.id;
 
     next();

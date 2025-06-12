@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import prisma from "../utils/db";
-import { loginSchema, signupSchema } from "../utils/validations";
+import {
+  changePasswordSchema,
+  loginSchema,
+  signupSchema,
+} from "../utils/validations";
 import { generateTokenAndSetCookie } from "../utils/auth";
 
 export const signUp = async (req: Request, res: Response) => {
@@ -128,12 +132,14 @@ export const checkAuth = async (req: Request, res: Response) => {
       where: { id: req.userId },
       omit: { password: true, updatedAt: true },
     });
-    if (!user) {
-      res
-        .status(401)
-        .json({ success: false, message: "User not authenticated" });
-      return;
-    }
+    // No need to check for user as user must already exist in the req
+    // as this is covered in the authenticate middleware
+    // if (!user) {
+    //   res
+    //     .status(401)
+    //     .json({ success: false, message: "User not authenticated" });
+    //   return;
+    // }
 
     res.status(200).json({
       success: true,
@@ -142,6 +148,52 @@ export const checkAuth = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error checking auth");
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const validatedData = changePasswordSchema.safeParse(req.body);
+    if (!validatedData.success) {
+      res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        error: validatedData.error.issues,
+      });
+      return;
+    }
+
+    const { currentPassword, newPassword } = validatedData.data;
+
+    const user = await prisma.user.findFirst({ where: { id: req.userId } });
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user?.password || ""
+    );
+    if (!isPasswordValid) {
+      res
+        .status(400)
+        .json({ success: false, message: "Old password isn't valid" });
+      return;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: { password: hashedNewPassword },
+    });
+
+    res
+      .status(200)
+      .json({ success: true, message: "Password changed successfully." });
+  } catch (error: any) {
+    console.error("Error changing password");
     res.status(500).json({
       success: false,
       message: error.message || "Internal Server Error",
