@@ -15,6 +15,10 @@ export const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 
+export const emailSchema = z.object({
+  email: z.string().email("Invalid email format"),
+});
+
 export const changePasswordSchema = z.object({
   newPassword: z
     .string()
@@ -26,6 +30,10 @@ export const changePasswordSchema = z.object({
     .min(8, "Current password must be at least 8 characters long"),
 });
 
-export const resendVerifyEmailSchema = z.object({
-  email: z.string().email("Invalid email format"),
+export const resetPasswordSchema = z.object({
+  newPassword: z
+    .string()
+    .min(8, "New password must be at least 8 characters long")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
 });

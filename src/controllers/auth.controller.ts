@@ -4,15 +4,17 @@ import prisma from "../utils/db";
 import {
   changePasswordSchema,
   loginSchema,
-  resendVerifyEmailSchema,
+  emailSchema,
   signupSchema,
+  resetPasswordSchema,
 } from "../utils/validations";
 import {
   generateAccessTokenAndSetCookie,
   generateTokenCode,
 } from "../utils/auth";
 import {
-  sendPasswordChangeEmail,
+  sendPasswordChangedEmail,
+  sendPasswordResetEmail,
   sendVerificationEmail,
   sendWelcomeEmail,
 } from "../utils/sendmail";
@@ -148,6 +150,49 @@ export const logout = async (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: "Logout successful" });
 };
 
+export const checkAuth = async (req: Request, res: Response) => {
+  try {
+    if (!req.userId) {
+      res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isVerified: true,
+        createdAt: true,
+      },
+    });
+    // No need to check for user as user must already exist in the req
+    // as this is covered in the authenticate middleware
+    // if (!user) {
+    //   res
+    //     .status(401)
+    //     .json({ success: false, message: "User not authenticated" });
+    //   return;
+    // }
+
+    res.status(200).json({
+      success: true,
+      message: "User is Authenticated",
+      data: { user },
+    });
+  } catch (error: any) {
+    console.error("Error checking auth");
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
 export const verifyEmail = async (req: Request, res: Response) => {
   try {
     const { verificationToken } = req.params;
@@ -203,7 +248,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
 };
 
 export const resendVerifyEmail = async (req: Request, res: Response) => {
-  const validatedData = resendVerifyEmailSchema.safeParse(req.body);
+  const validatedData = emailSchema.safeParse(req.body);
   if (!validatedData.success) {
     res.status(400).json({
       success: false,
@@ -276,43 +321,6 @@ export const resendVerifyEmail = async (req: Request, res: Response) => {
   }
 };
 
-export const checkAuth = async (req: Request, res: Response) => {
-  try {
-    if (!req.userId) {
-      res.status(401).json({
-        success: false,
-        message: "User not authenticated",
-      });
-      return;
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      omit: { password: true, updatedAt: true },
-    });
-    // No need to check for user as user must already exist in the req
-    // as this is covered in the authenticate middleware
-    // if (!user) {
-    //   res
-    //     .status(401)
-    //     .json({ success: false, message: "User not authenticated" });
-    //   return;
-    // }
-
-    res.status(200).json({
-      success: true,
-      message: "User is Authenticated",
-      data: { user },
-    });
-  } catch (error: any) {
-    console.error("Error checking auth");
-    res.status(500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
-    });
-  }
-};
-
 export const changePassword = async (req: Request, res: Response) => {
   const validatedData = changePasswordSchema.safeParse(req.body);
   if (!validatedData.success) {
@@ -335,7 +343,16 @@ export const changePassword = async (req: Request, res: Response) => {
     if (!isPasswordValid) {
       res
         .status(400)
-        .json({ success: false, message: "Old password isn't valid" });
+        .json({ success: false, message: "Current password is incorrect" });
+      return;
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user!.password);
+    if (isSamePassword) {
+      res.status(400).json({
+        success: false,
+        message: "New password must be different from current password",
+      });
       return;
     }
 
@@ -349,13 +366,142 @@ export const changePassword = async (req: Request, res: Response) => {
 
     generateAccessTokenAndSetCookie(res, req.userId);
 
-    await sendPasswordChangeEmail(user!.email, user!.name);
+    await sendPasswordChangedEmail(user!.email, user!.name);
 
     res
       .status(200)
       .json({ success: true, message: "Password changed successfully." });
   } catch (error: any) {
     console.error("Error changing password");
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  const validatedData = emailSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+  const { email } = validatedData.data;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user || !user.isVerified) {
+      res.status(200).json({
+        success: true,
+        message:
+          "If an account exists with this email, you will receive a password reset link",
+      });
+      return;
+    }
+
+    if (
+      user.passwordResetTokenExpiresAt &&
+      user.passwordResetTokenExpiresAt > new Date()
+    ) {
+      res.status(200).json({
+        success: true,
+        message:
+          "If an account exists with this email, you will receive a password reset link",
+      });
+      return;
+    }
+
+    const passwordResetToken = generateTokenCode(20);
+    const passwordResetTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordResetToken, passwordResetTokenExpiresAt },
+    });
+
+    await sendPasswordResetEmail(user.email, user.name, passwordResetToken);
+
+    res.status(200).json({
+      success: true,
+      message:
+        "If an account exists with this email, you will receive a password reset link",
+    });
+  } catch (error: any) {
+    console.error("Forgot password error");
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const validatedData = resetPasswordSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const { newPassword } = validatedData.data;
+  const { resetToken } = req.params;
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: resetToken,
+        passwordResetTokenExpiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Invalid or expired password reset token. Please request a new password reset.",
+      });
+      return;
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      res.status(400).json({
+        success: false,
+        message: "New password must be different from current password",
+      });
+      return;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedNewPassword,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+      },
+    });
+
+    generateAccessTokenAndSetCookie(res, user.id);
+
+    await sendPasswordChangedEmail(user!.email, user!.name);
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+  } catch (error: any) {
+    console.error("Error resetting password");
     res.status(500).json({
       success: false,
       message: error.message || "Internal Server Error",

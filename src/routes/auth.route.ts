@@ -7,6 +7,8 @@ import {
   changePassword,
   verifyEmail,
   resendVerifyEmail,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/auth.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 
@@ -20,6 +22,10 @@ router.post("/logout", logout);
 // Email verification routes
 router.get("/verify-email/:verificationToken", verifyEmail);
 router.post("/resend-verify-email", resendVerifyEmail);
+
+// Password reset routes
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:resetToken", resetPassword);
 
 // Protected routes (requiring authentication)
 router.get("/check-auth", authenticate, checkAuth);
