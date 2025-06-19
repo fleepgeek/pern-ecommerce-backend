@@ -37,3 +37,31 @@ export const resetPasswordSchema = z.object({
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
 });
+
+export const productSchema = z.object({
+  name: z
+    .string({ message: "Product name is a required" })
+    .min(2, "Product name must have at least 2 characters"),
+  description: z.string({ required_error: "Product description is required" }),
+  price: z.number({
+    required_error: "Price is required",
+    invalid_type_error: "Price must be a number",
+  }),
+  isPublished: z.boolean().optional(),
+  categoryId: z.string().optional(),
+});
+
+export const addMediaSchema = z
+  .array(
+    z.object({
+      fieldname: z.string(),
+      originalname: z.string(),
+      encoding: z.string(),
+      mimetype: z.string(),
+      buffer: z.instanceof(Buffer),
+      size: z.number(),
+    }),
+    { required_error: "Photos is required" }
+  )
+  .min(1, "At least one image is required")
+  .max(5, "You can't add more that 5 images");

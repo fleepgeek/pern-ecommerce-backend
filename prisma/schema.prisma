@@ -23,4 +23,52 @@ model User {
   passwordResetTokenExpiresAt DateTime?
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
+  product                     Product[]
+  media                       Media[]
 }
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  isPublished Boolean   @default(false)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId  String?
+  media       Media[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([categoryId]) // For faster category lookups
+  @@index([name]) // For product searches
+  @@index([userId]) // Add index for user lookups
+}
+
+model Media {
+  id           String   @id @default(cuid())
+  url          String
+  isDefault    Boolean  @default(false) // Main product image
+  product      Product  @relation(fields: [productId], references: [id])
+  productId    String
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  // type      MediaType // Use enum for media types
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  product     Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// enum MediaType {
+//   IMAGE
+//   VIDEO
+// }
