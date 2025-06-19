@@ -8,7 +8,7 @@ import authRouter from "./routes/auth.route";
 import { authenticate } from "./middlewares/auth.middleware";
 import rateLimiter, { authLimiter } from "./middlewares/limiter.middleware";
 import configureCloudinary from "./config/cloudinary";
-import multer from "multer";
+import errorHandler from "./middlewares/error.middleware";
 
 dotenv.config();
 
@@ -35,17 +35,9 @@ app.get("/v1/api/protected", authenticate, (req: Request, res: Response) => {
   res.send({ success: true, message: "Protected api" });
 });
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  if (err instanceof multer.MulterError) {
-    console.log(err);
-    res
-      .status(400)
-      .json({ success: false, message: `${err.code} - ${err.message}` });
-    return;
-  }
-  // Other errors
-  next(err);
-});
+// Error Handling Middleware
+// Express calls this when an error is passed to next(), because of the first 'err' argument
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
