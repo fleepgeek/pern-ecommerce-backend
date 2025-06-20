@@ -1,8 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../utils/db";
-import { addMediaSchema, productSchema } from "../utils/validations";
-import { uploadImage } from "../utils/handleImage";
-import { Prisma } from "../../generated/prisma";
+import { productSchema } from "../utils/validations";
 
 export const createProduct = async (req: Request, res: Response) => {
   const validatedData = productSchema.safeParse(req.body);
@@ -36,61 +34,6 @@ export const createProduct = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error creating product");
-    res.status(500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
-    });
-  }
-};
-
-export const addMediaToProduct = async (req: Request, res: Response) => {
-  const validatedData = addMediaSchema.safeParse(req.files);
-  if (!validatedData.success) {
-    res.status(400).json({
-      success: false,
-      message: "Validation error",
-      error: validatedData.error.issues,
-    });
-    return;
-  }
-
-  const photos = validatedData.data;
-  const { id } = req.params;
-
-  try {
-    const product = await prisma.product.findFirst({ where: { id } });
-    if (!product) {
-      res.status(404).json({ success: false, message: "Product not found" });
-      return;
-    }
-
-    const imageUrls = await Promise.all(
-      photos.map((photo) => uploadImage(photo as Express.Multer.File))
-    );
-
-    const createdMedia = await prisma.media.createManyAndReturn({
-      data: imageUrls.map(
-        (imageUrl): Prisma.MediaCreateManyInput => ({
-          url: imageUrl,
-          uploadedById: req.userId,
-          productId: id,
-          isDefault: imageUrl === imageUrls[0] ? true : false,
-        })
-      ),
-      select: {
-        url: true,
-        productId: true,
-        isDefault: true,
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Media successfully added to product",
-      data: { media: createdMedia },
-    });
-  } catch (error: any) {
-    console.error("Error adding media to product");
     res.status(500).json({
       success: false,
       message: error.message || "Internal Server Error",
@@ -156,9 +99,59 @@ export const getProductById = async (req: Request, res: Response) => {
 };
 
 export const updateProduct = async (req: Request, res: Response) => {
-  // TODO: Implement product update logic
+  const validatedData = productSchema.partial().safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation error",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const { id } = req.params;
+
+  try {
+    const product = await prisma.product.findFirst({ where: { id } });
+    if (!product) {
+      res.status(404).json({ success: false, message: "Product not found" });
+      return;
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: validatedData.data,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      data: { product: updatedProduct },
+    });
+  } catch (error: any) {
+    console.error("Error updating product");
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
 };
 
 export const deleteProduct = async (req: Request, res: Response) => {
-  // TODO: Implement product deletion logic
+  const { id } = req.params;
+
+  try {
+    const product = await prisma.product.findFirst({ where: { id } });
+    if (!product) {
+      res.status(404).json({ success: false, message: "Product not found" });
+      return;
+    }
+
+    await prisma.product.delete({ where: { id } });
+
+    res.status(200).json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (error: any) {
+    console.error("Error deleting product");
+    res.status(500).json({ success: false, message: error.message });
+  }
 };

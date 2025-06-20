@@ -40,6 +40,7 @@ export const signUp = async (req: Request, res: Response) => {
       if (userExists) {
         // Instead of throwing generic Error, throw custom error with status
         // do this because we can't set status codes inside a transaction
+        // TODO: Create Custom Error class
         throw { status: 409, message: "User already exists" };
       }
 

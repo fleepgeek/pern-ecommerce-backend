@@ -50,10 +50,10 @@ model Media {
   id           String   @id @default(cuid())
   url          String
   isDefault    Boolean  @default(false) // Main product image
-  product      Product  @relation(fields: [productId], references: [id])
-  productId    String
-  uploadedById String
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId    String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedById String?
   // type      MediaType // Use enum for media types
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

@@ -5,23 +5,19 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  addMediaToProduct,
 } from "../controllers/product.controller";
 import { authenticate } from "../middlewares/auth.middleware";
-import upload from "../middlewares/upload.middleware";
+import mediaRoutes from "./media.route";
 
 const router = Router();
 
 router.get("/", getProducts);
 router.post("/", authenticate, createProduct);
-router.post(
-  "/:id/add-media",
-  authenticate,
-  upload.array("photos", 5),
-  addMediaToProduct
-);
+
 router.get("/:id", getProductById);
-router.put("/:id", authenticate, updateProduct);
+router.patch("/:id", authenticate, updateProduct);
 router.delete("/:id", authenticate, deleteProduct);
+
+router.use("/:productId/media", mediaRoutes);
 
 export default router;

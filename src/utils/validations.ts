@@ -51,7 +51,7 @@ export const productSchema = z.object({
   categoryId: z.string().optional(),
 });
 
-export const addMediaSchema = z
+export const mediaSchema = z
   .array(
     z.object({
       fieldname: z.string(),
@@ -61,7 +61,7 @@ export const addMediaSchema = z
       buffer: z.instanceof(Buffer),
       size: z.number(),
     }),
-    { required_error: "Photos is required" }
+    { required_error: "Photos are required" }
   )
   .min(1, "At least one image is required")
   .max(5, "You can't add more that 5 images");
