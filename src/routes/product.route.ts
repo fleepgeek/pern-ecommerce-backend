@@ -12,11 +12,11 @@ import mediaRoutes from "./media.route";
 const router = Router();
 
 router.get("/", getProducts);
-router.post("/", authenticate, createProduct);
+router.post("/", authenticate, createProduct); // TODO: Make only for admin access
 
 router.get("/:id", getProductById);
-router.patch("/:id", authenticate, updateProduct);
-router.delete("/:id", authenticate, deleteProduct);
+router.patch("/:id", authenticate, updateProduct); // TODO: Make only for admin access
+router.delete("/:id", authenticate, deleteProduct); // TODO: Make only for admin access
 
 router.use("/:productId/media", mediaRoutes);
 

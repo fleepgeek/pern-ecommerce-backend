@@ -13,7 +13,8 @@ export const createProduct = async (req: Request, res: Response) => {
     return;
   }
 
-  const { name, description, price, isPublished, categoryId } = req.body;
+  const { name, description, price, isPublished, categoryId } =
+    validatedData.data;
 
   try {
     const product = await prisma.product.create({

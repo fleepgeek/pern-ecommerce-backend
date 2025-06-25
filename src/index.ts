@@ -3,8 +3,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 
-import productRouter from "./routes/product.route";
 import authRouter from "./routes/auth.route";
+import userRouter from "./routes/user.route";
+import productRouter from "./routes/product.route";
+import orderRouter from "./routes/order.route";
 import { authenticate } from "./middlewares/auth.middleware";
 import rateLimiter, { authLimiter } from "./middlewares/limiter.middleware";
 import configureCloudinary from "./config/cloudinary";
@@ -29,7 +31,9 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/v1/api/auth", authLimiter, authRouter);
+app.use("/v1/api/user", authLimiter, userRouter);
 app.use("/v1/api/product", productRouter);
+app.use("/v1/api/order", authenticate, orderRouter);
 
 app.get("/v1/api/protected", authenticate, (req: Request, res: Response) => {
   res.send({ success: true, message: "Protected api" });

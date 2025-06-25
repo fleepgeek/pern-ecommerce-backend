@@ -65,3 +65,28 @@ export const mediaSchema = z
   )
   .min(1, "At least one image is required")
   .max(5, "You can't add more that 5 images");
+
+export const orderSchema = z.object({
+  cartItems: z
+    .array(
+      z.object({
+        productId: z
+          .string({ required_error: "Product Id is required" })
+          .min(10, "Product Id must contain at least 10 characters"),
+        quantity: z
+          .number({ required_error: "Product Quantity is required" })
+          .min(1, "Quantity must be at least 1"),
+      }),
+      { required_error: "Products are required" }
+    )
+    .min(1, "At least one product is required"),
+});
+
+export const shippingAddressSchema = z.object({
+  address: z.string().min(5, "Address must be at least 5 characters long"),
+  state: z.string().min(2, "City must be at least 2 characters long"),
+  postalCode: z
+    .string()
+    .min(3, "Postal code must be at least 3 characters long"),
+  country: z.string().min(2, "Country must be at least 2 characters long"),
+});
