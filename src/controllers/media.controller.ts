@@ -95,7 +95,7 @@ export const deleteMediaFromProduct = async (req: Request, res: Response) => {
     try {
       await deleteImageFromCloud(media.url);
     } catch (error: any) {
-      console.log("Error deleting image from cloud:", error.message);
+      console.error("Error deleting image from cloud:", error.message);
     }
 
     res.status(200).json({

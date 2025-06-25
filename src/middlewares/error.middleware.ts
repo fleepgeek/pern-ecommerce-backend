@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 
 const errorHandler = (
-  err: Error,
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction
@@ -17,7 +17,7 @@ const errorHandler = (
 
   // Generic error handler
   console.error("Unhandled error:", err);
-  res.status(500).json({
+  res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
   });

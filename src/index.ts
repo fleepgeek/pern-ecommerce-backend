@@ -11,6 +11,7 @@ import { authenticate } from "./middlewares/auth.middleware";
 import rateLimiter, { authLimiter } from "./middlewares/limiter.middleware";
 import configureCloudinary from "./config/cloudinary";
 import errorHandler from "./middlewares/error.middleware";
+// import { stripeWebHookHandler } from "./controllers/order.controller";
 
 dotenv.config();
 
@@ -21,6 +22,17 @@ const app = express();
 
 // app.use(cors({ credentials: true, origin: "http://localhost:5000" }));
 app.use(cors());
+
+// app.post(
+//   "/v1/api/order/checkout/webhook",
+//   express.raw({ type: "application/json" }),
+//   stripeWebHookHandler
+// );
+app.use(
+  "/v1/api/order/checkout/webhook",
+  express.raw({ type: "application/json" })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -33,7 +45,7 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/v1/api/auth", authLimiter, authRouter);
 app.use("/v1/api/user", authLimiter, userRouter);
 app.use("/v1/api/product", productRouter);
-app.use("/v1/api/order", authenticate, orderRouter);
+app.use("/v1/api/order", orderRouter);
 
 app.get("/v1/api/protected", authenticate, (req: Request, res: Response) => {
   res.send({ success: true, message: "Protected api" });
