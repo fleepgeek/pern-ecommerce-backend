@@ -83,6 +83,18 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
     metadata: {
       orderId: order.id,
     },
+    shipping_options: [
+      {
+        shipping_rate_data: {
+          display_name: "Delivery",
+          type: "fixed_amount",
+          fixed_amount: {
+            amount: 50 * 100, // in cents
+            currency: "usd",
+          },
+        },
+      },
+    ],
     success_url: `${FRONTEND_URL}/order-status?success=true`,
     cancel_url: `${FRONTEND_URL}/cart?canceled=true`,
   });

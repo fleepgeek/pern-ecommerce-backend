@@ -38,8 +38,8 @@ model Product {
   description String
   price       Float
   isPublished Boolean    @default(false)
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
+  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      String?
   category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId  String?
   media       Media[]
