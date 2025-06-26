@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../utils/db";
-import { productSchema } from "../utils/validations";
+import { idSchema, productSchema } from "../utils/validations";
 
 export const createProduct = async (req: Request, res: Response) => {
   const validatedData = productSchema.safeParse(req.body);
@@ -68,8 +68,16 @@ export const getProducts = async (req: Request, res: Response) => {
 };
 
 export const getProductById = async (req: Request, res: Response) => {
+  const validatedId = idSchema.safeParse(req.params.id);
+  if (!validatedId.success) {
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid product ID format" });
+    return;
+  }
+
   try {
-    const { id } = req.params;
+    const id = validatedId.data;
     const product = await prisma.product.findFirst({
       where: { id },
       include: {
@@ -100,6 +108,14 @@ export const getProductById = async (req: Request, res: Response) => {
 };
 
 export const updateProduct = async (req: Request, res: Response) => {
+  const validatedId = idSchema.safeParse(req.params.id);
+  if (!validatedId.success) {
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid order ID format" });
+    return;
+  }
+
   const validatedData = productSchema.partial().safeParse(req.body);
   if (!validatedData.success) {
     res.status(400).json({
@@ -110,7 +126,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     return;
   }
 
-  const { id } = req.params;
+  const id = validatedId.data;
 
   try {
     const product = await prisma.product.findFirst({ where: { id } });
@@ -136,7 +152,14 @@ export const updateProduct = async (req: Request, res: Response) => {
 };
 
 export const deleteProduct = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const validatedId = idSchema.safeParse(req.params.id);
+  if (!validatedId.success) {
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid order ID format" });
+    return;
+  }
+  const id = validatedId.data;
 
   try {
     const product = await prisma.product.findFirst({ where: { id } });

@@ -1,13 +1,13 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
 import prisma from "../utils/db";
-import { orderSchema } from "../utils/validations";
+import { idSchema, cartSchema, orderSchema } from "../utils/validations";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
 
 export const createCheckoutSession = async (req: Request, res: Response) => {
-  const validatedData = orderSchema.safeParse(req.body);
+  const validatedData = cartSchema.safeParse(req.body);
   if (!validatedData.success) {
     res.status(400).json({
       success: false,
@@ -128,11 +128,11 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
       });
       if (!order) break;
 
-      if (order.paymentStatus !== "PAID") {
+      if (order.paymentStatus !== "PAID" && event.data.object.amount_total) {
         await prisma.order.update({
           where: { id: order.id },
           data: {
-            totalAmount: event.data.object.amount_total,
+            totalAmount: event.data.object.amount_total / 100, // converting it back to usd from cents
             paymentStatus: "PAID",
             status: "PAID",
           },
@@ -169,25 +169,188 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
 };
 
 export const getOrders = async (req: Request, res: Response) => {
-  res.send("Get all orders");
+  const orders = await prisma.order.findMany({
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      shippingAddress: true,
+      cartItems: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Orders successfully retrieved",
+    data: { orders },
+  });
 };
 
 export const getCurrentUserOrders = async (req: Request, res: Response) => {
-  // TODO: Implement get current user orders logic
-  res.send("Get current user orders");
+  const orders = await prisma.order.findMany({
+    where: { userId: req.userId },
+    include: {
+      shippingAddress: true,
+      cartItems: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "User orders successfully retrieved",
+    data: { orders },
+  });
 };
 
 export const getOrderById = async (req: Request, res: Response) => {
-  // TODO: Implement get order by ID logic
-  res.send(`Get order with ID: ${req.params.id}`);
+  const validatedData = idSchema.safeParse(req.params.id);
+  if (!validatedData.success) {
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid order ID format" });
+    return;
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { id: validatedData.data },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      shippingAddress: true,
+      cartItems: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw { status: 404, message: "Order not found" };
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Order successfully retrieved",
+    data: { order },
+  });
 };
 
 export const updateOrder = async (req: Request, res: Response) => {
-  // TODO: Implement update order logic
-  res.send(`Update order with ID: ${req.params.id}`);
+  const validatedId = idSchema.safeParse(req.params.id);
+  if (!validatedId.success) {
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid order ID format" });
+    return;
+  }
+
+  const validatedData = orderSchema.safeParse(req.body);
+  if (!validatedData.success) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      error: validatedData.error.issues,
+    });
+    return;
+  }
+
+  const id = validatedId.data;
+
+  const order = await prisma.order.findFirst({
+    where: { id },
+  });
+
+  if (!order) {
+    res.status(404).json({ success: false, message: "Order not found" });
+    return;
+  }
+
+  // Only allow updating certain fields, e.g., status and paymentStatus
+  // there wont be need for spreading(as seen below) if validatedData.data is passed directly
+  // im just doing this here to show how we can remove falsy values when using object destructuring
+  const { status, paymentStatus } = validatedData.data;
+
+  const updatedOrder = await prisma.order.update({
+    where: { id },
+    data: {
+      ...(status && { status }),
+      ...(paymentStatus && { paymentStatus }),
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Order successfully updated",
+    data: { order: updatedOrder },
+  });
 };
 
 export const deleteOrder = async (req: Request, res: Response) => {
-  // TODO: Implement delete order logic
-  res.send(`Delete order with ID: ${req.params.id}`);
+  const validatedData = idSchema.safeParse(req.params.id);
+  if (!validatedData.success) {
+    res
+      .status(400)
+      .json({ success: false, message: "Invalid order ID format" });
+    return;
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { id: validatedData.data },
+  });
+
+  if (!order) {
+    res.status(404).json({ success: false, message: "Order not found" });
+    return;
+  }
+
+  await prisma.order.delete({
+    where: { id: validatedData.data },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Order successfully deleted",
+  });
 };

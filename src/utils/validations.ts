@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const idSchema = z.string().cuid();
+
 export const signupSchema = z.object({
   email: z.string().email("Invalid email format"),
   password: z
@@ -38,6 +40,15 @@ export const resetPasswordSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
 });
 
+export const shippingAddressSchema = z.object({
+  address: z.string().min(5, "Address must be at least 5 characters long"),
+  state: z.string().min(2, "City must be at least 2 characters long"),
+  postalCode: z
+    .string()
+    .min(3, "Postal code must be at least 3 characters long"),
+  country: z.string().min(2, "Country must be at least 2 characters long"),
+});
+
 export const productSchema = z.object({
   name: z
     .string({ message: "Product name is a required" })
@@ -66,12 +77,13 @@ export const mediaSchema = z
   .min(1, "At least one image is required")
   .max(5, "You can't add more that 5 images");
 
-export const orderSchema = z.object({
+export const cartSchema = z.object({
   cartItems: z
     .array(
       z.object({
         productId: z
           .string({ required_error: "Product Id is required" })
+          .cuid("Invalid product id format")
           .min(10, "Product Id must contain at least 10 characters"),
         quantity: z
           .number({ required_error: "Product Quantity is required" })
@@ -82,11 +94,27 @@ export const orderSchema = z.object({
     .min(1, "At least one product is required"),
 });
 
-export const shippingAddressSchema = z.object({
-  address: z.string().min(5, "Address must be at least 5 characters long"),
-  state: z.string().min(2, "City must be at least 2 characters long"),
-  postalCode: z
-    .string()
-    .min(3, "Postal code must be at least 3 characters long"),
-  country: z.string().min(2, "Country must be at least 2 characters long"),
-});
+export const orderSchema = z
+  .object(
+    {
+      status: z
+        .enum(["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"], {
+          invalid_type_error: "Invalid order status",
+        })
+        .optional(),
+      paymentStatus: z
+        .enum(["PENDING", "PAID", "FAILED", "REFUNDED"], {
+          invalid_type_error: "Invalid payment status",
+        })
+        .optional(),
+    },
+    { required_error: "Order status or payment status is required" }
+  )
+  .refine(
+    (data) => data.status !== undefined || data.paymentStatus !== undefined,
+    {
+      message: "At least one of status or paymentStatus must be provided",
+      path: [], // No specific path, applies to the whole object
+      // path: ["status", "paymentStatus"],
+    }
+  );
