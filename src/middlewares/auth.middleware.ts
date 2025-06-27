@@ -59,3 +59,19 @@ export const authenticate = async (
     });
   }
 };
+
+export const authorize = (allowedRoles: string[]) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const user = await prisma.user.findFirst({ where: { id: req.userId } });
+
+    if (!allowedRoles.includes(user!.role)) {
+      res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+      return;
+    }
+
+    next();
+  };
+};

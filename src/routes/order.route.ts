@@ -8,11 +8,12 @@ import {
   stripeWebHookHandler,
   updateOrder,
 } from "../controllers/order.controller";
-import { authenticate } from "../middlewares/auth.middleware";
+import { authenticate, authorize } from "../middlewares/auth.middleware";
+import { Role } from "../../generated/prisma";
 
 const router = Router();
 
-router.get("/", authenticate, getOrders); // TODO: Make only for admin access
+router.get("/", authenticate, authorize([Role.ADMIN]), getOrders); // TODO: Make only for admin access
 router.post(
   "/checkout/create-checkout-session",
   authenticate,
@@ -21,7 +22,7 @@ router.post(
 router.post("/checkout/webhook", stripeWebHookHandler);
 router.get("/me", authenticate, getCurrentUserOrders);
 router.get("/:id", authenticate, getOrderById);
-router.patch("/:id", authenticate, updateOrder); // TODO: Make only for admin access
-router.delete("/:id", authenticate, deleteOrder); // TODO: Make only for admin access
+router.patch("/:id", authenticate, authorize([Role.ADMIN]), updateOrder);
+router.delete("/:id", authenticate, authorize([Role.ADMIN]), deleteOrder);
 
 export default router;

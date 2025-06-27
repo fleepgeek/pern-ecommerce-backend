@@ -16,6 +16,7 @@ model User {
   name                        String
   email                       String           @unique
   password                    String
+  role                        Role             @default(USER) // Default role is USER
   isVerified                  Boolean          @default(false)
   verificationToken           String?
   verificationTokenExpiresAt  DateTime?
@@ -114,6 +115,11 @@ model ShippingAddress {
   updatedAt  DateTime @updatedAt
 
   @@index([userId])
+}
+
+enum Role {
+  USER
+  ADMIN
 }
 
 enum OrderStatus {

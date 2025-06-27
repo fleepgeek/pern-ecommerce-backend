@@ -6,18 +6,19 @@ import {
   updateProduct,
   deleteProduct,
 } from "../controllers/product.controller";
-import { authenticate } from "../middlewares/auth.middleware";
+import { authenticate, authorize } from "../middlewares/auth.middleware";
 import mediaRoutes from "./media.route";
+import { Role } from "../../generated/prisma";
 
 const router = Router();
 
 router.get("/", getProducts);
-router.post("/", authenticate, createProduct); // TODO: Make only for admin access
+router.post("/", authenticate, authorize([Role.ADMIN]), createProduct); // TODO: Make only for admin access
 
 router.get("/:id", getProductById);
-router.patch("/:id", authenticate, updateProduct); // TODO: Make only for admin access
-router.delete("/:id", authenticate, deleteProduct); // TODO: Make only for admin access
+router.patch("/:id", authenticate, authorize([Role.ADMIN]), updateProduct);
+router.delete("/:id", authenticate, authorize([Role.ADMIN]), deleteProduct);
 
-router.use("/:productId/media", mediaRoutes);
+router.use("/:productId/media", authorize([Role.ADMIN]), mediaRoutes);
 
 export default router;

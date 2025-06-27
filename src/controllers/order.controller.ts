@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Stripe from "stripe";
 import prisma from "../utils/db";
 import { idSchema, cartSchema, orderSchema } from "../utils/validations";
+import { OrderStatus, PaymentStatus } from "../../generated/prisma";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
@@ -140,13 +141,16 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
       });
       if (!order) break;
 
-      if (order.paymentStatus !== "PAID" && event.data.object.amount_total) {
+      if (
+        order.paymentStatus !== PaymentStatus.PAID &&
+        event.data.object.amount_total
+      ) {
         await prisma.order.update({
           where: { id: order.id },
           data: {
             totalAmount: event.data.object.amount_total / 100, // converting it back to usd from cents
-            paymentStatus: "PAID",
-            status: "PAID",
+            paymentStatus: PaymentStatus.PAID,
+            status: OrderStatus.PAID,
           },
         });
       }
@@ -162,11 +166,11 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
       });
       if (!order) break;
 
-      if (order.paymentStatus !== "FAILED") {
+      if (order.paymentStatus !== PaymentStatus.FAILED) {
         await prisma.order.update({
           where: { id: order.id },
           data: {
-            paymentStatus: "FAILED",
+            paymentStatus: PaymentStatus.FAILED,
           },
         });
       }

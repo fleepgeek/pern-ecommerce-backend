@@ -74,6 +74,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       name: true,
       email: true,
       isVerified: true,
+      role: true,
       createdAt: true,
       shippingAddress: {
         select: {
@@ -131,6 +132,14 @@ export const updateUser = async (req: Request, res: Response) => {
     return;
   }
 
+  if (user.id !== req.userId || user.role !== "ADMIN") {
+    res.status(403).json({
+      success: false,
+      message: "You dont have the permission to update this user",
+    });
+    return;
+  }
+
   const updatedUser = await prisma.user.update({
     where: { id },
     data: validatedData.data,
@@ -169,8 +178,18 @@ export const deleteUser = async (req: Request, res: Response) => {
     where: { id },
   });
 
-  if (user.id === req.userId) {
-    // If the user being deleted is the current user, clear the cookie
+  const isOwner = user.id === req.userId;
+  const isAdmin = user.role === "ADMIN";
+
+  if (!isOwner || !isAdmin) {
+    res.status(403).json({
+      success: false,
+      message: "You dont have the permission to update this user",
+    });
+    return;
+  }
+
+  if (isOwner) {
     res.clearCookie("token");
   }
 
