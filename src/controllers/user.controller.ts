@@ -2,6 +2,11 @@ import { Request, Response } from "express";
 import { shippingAddressSchema, userSchema } from "../utils/validations";
 import prisma from "../utils/db";
 import { idSchema } from "../utils/validations";
+import {
+  AuthenticationError,
+  BadRequestError,
+  NotFoundError,
+} from "../middlewares/error.middleware";
 
 export const getUsers = async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
@@ -24,12 +29,7 @@ export const getUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
   const validatedId = idSchema.safeParse(req.params.id);
   if (!validatedId.success) {
-    res.status(400).json({
-      success: false,
-      message: "Invalid user id",
-      error: validatedId.error.issues,
-    });
-    return;
+    throw new BadRequestError("Invalid user id");
   }
 
   const id = validatedId.data;
@@ -55,8 +55,7 @@ export const getUserById = async (req: Request, res: Response) => {
   });
 
   if (!user) {
-    res.status(404).json({ success: false, message: "User not found" });
-    return;
+    throw new NotFoundError("User not found");
   }
 
   res.status(200).json({
@@ -89,8 +88,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
   });
 
   if (!user) {
-    res.status(404).json({ success: false, message: "User not found" });
-    return;
+    throw new NotFoundError("User not found");
   }
 
   res.status(200).json({
@@ -103,22 +101,12 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 export const updateUser = async (req: Request, res: Response) => {
   const validatedId = idSchema.safeParse(req.params.id);
   if (!validatedId.success) {
-    res.status(400).json({
-      success: false,
-      message: "Invalid user id",
-      error: validatedId.error.issues,
-    });
-    return;
+    throw new BadRequestError("Invalid user id");
   }
 
   const validatedData = userSchema.safeParse(req.body);
   if (!validatedData.success) {
-    res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      error: validatedData.error.issues,
-    });
-    return;
+    throw new BadRequestError("Validation failed", validatedData.error.issues);
   }
 
   const id = validatedId.data;
@@ -129,21 +117,36 @@ export const updateUser = async (req: Request, res: Response) => {
   });
 
   if (!user) {
-    res.status(404).json({ success: false, message: "User not found" });
-    return;
+    throw new NotFoundError("User not found");
   }
 
-  // if (user.id !== req.userId || user.roles.include(role => role ==="ADMIN") {
-  //   res.status(403).json({
-  //     success: false,
-  //     message: "You dont have the permission to update this user",
-  //   });
-  //   return;
-  // }
+  const loggedInUser = await prisma.user.findFirst({
+    where: { id: req.userId },
+    include: { roles: { include: { role: true } } },
+  });
+
+  const isOwner = user.id === loggedInUser?.id;
+  const isAdmin = loggedInUser?.roles.some(
+    (userRole) => userRole.role.name === "ADMIN"
+  );
+
+  if (!isOwner && !isAdmin) {
+    throw new AuthenticationError(
+      "You dont have the permission to update this user",
+      403
+    );
+  }
 
   const updatedUser = await prisma.user.update({
     where: { id },
     data: validatedData.data,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      isVerified: true,
+      createdAt: true,
+    },
   });
 
   res.status(200).json({
@@ -156,12 +159,7 @@ export const updateUser = async (req: Request, res: Response) => {
 export const deleteUser = async (req: Request, res: Response) => {
   const validatedId = idSchema.safeParse(req.params.id);
   if (!validatedId.success) {
-    res.status(400).json({
-      success: false,
-      message: "Invalid user id",
-      error: validatedId.error.issues,
-    });
-    return;
+    throw new BadRequestError("Invalid user id");
   }
 
   const id = validatedId.data;
@@ -172,24 +170,29 @@ export const deleteUser = async (req: Request, res: Response) => {
   });
 
   if (!user) {
-    res.status(404).json({ success: false, message: "User not found" });
-    return;
+    throw new NotFoundError("User not found");
+  }
+
+  const loggedInUser = await prisma.user.findFirst({
+    where: { id: req.userId },
+    include: { roles: { include: { role: true } } },
+  });
+
+  const isOwner = user.id === loggedInUser?.id;
+  const isAdmin = loggedInUser?.roles.some(
+    (userRole) => userRole.role.name === "ADMIN"
+  );
+
+  if (!isOwner && !isAdmin) {
+    throw new AuthenticationError(
+      "You dont have the permission to delete this user",
+      403
+    );
   }
 
   await prisma.user.delete({
     where: { id },
   });
-
-  const isOwner = user.id === req.userId;
-  const isAdmin = user.roles.some((role) => role.role.name === "ADMIN");
-
-  if (!isOwner || !isAdmin) {
-    res.status(403).json({
-      success: false,
-      message: "You dont have the permission to update this user",
-    });
-    return;
-  }
 
   if (isOwner) {
     res.clearCookie("token");
@@ -204,12 +207,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 export const setShippingAddress = async (req: Request, res: Response) => {
   const validatedData = shippingAddressSchema.safeParse(req.body);
   if (!validatedData.success) {
-    res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      error: validatedData.error.issues,
-    });
-    return;
+    throw new BadRequestError("Validation failed", validatedData.error.issues);
   }
 
   const { address, state, country, postalCode } = validatedData.data;
@@ -244,11 +242,7 @@ export const deleteShippingAddress = async (req: Request, res: Response) => {
   });
 
   if (!shippingAddress) {
-    res.status(404).json({
-      success: false,
-      message: "Shipping Address not found",
-    });
-    return;
+    throw new NotFoundError("Shipping Address not found");
   }
 
   await prisma.shippingAddress.delete({

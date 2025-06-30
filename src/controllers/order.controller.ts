@@ -3,6 +3,11 @@ import Stripe from "stripe";
 import prisma from "../utils/db";
 import { idSchema, cartSchema, orderSchema } from "../utils/validations";
 import { OrderStatus, PaymentStatus } from "../../generated/prisma";
+import {
+  AppError,
+  BadRequestError,
+  NotFoundError,
+} from "../middlewares/error.middleware";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
@@ -10,12 +15,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL as string;
 export const createCheckoutSession = async (req: Request, res: Response) => {
   const validatedData = cartSchema.safeParse(req.body);
   if (!validatedData.success) {
-    res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      error: validatedData.error.issues,
-    });
-    return;
+    throw new BadRequestError("Validation failed", validatedData.error.issues);
   }
 
   const { cartItems } = validatedData.data;
@@ -26,10 +26,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
   });
 
   if (!user!.shippingAddress) {
-    res
-      .status(400)
-      .json({ success: false, message: "Shipping Address is required" });
-    return;
+    throw new BadRequestError("Shipping Address is required");
   }
 
   const produtIds = cartItems.map((items) => items.productId);
@@ -38,10 +35,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
   });
 
   if (products.length !== cartItems.length) {
-    res
-      .status(404)
-      .json({ success: false, message: "One or more products not found" });
-    return;
+    throw new NotFoundError("One or more products not found");
   }
 
   const order = await prisma.order.create({
@@ -101,10 +95,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
   });
 
   if (!session.url) {
-    res
-      .status(500)
-      .json({ success: false, message: "Error creating stripe sesssion" });
-    return;
+    throw new AppError("Error creating Stripe payment sesssion");
   }
 
   res.status(201).json({
@@ -251,10 +242,7 @@ export const getCurrentUserOrders = async (req: Request, res: Response) => {
 export const getOrderById = async (req: Request, res: Response) => {
   const validatedData = idSchema.safeParse(req.params.id);
   if (!validatedData.success) {
-    res
-      .status(400)
-      .json({ success: false, message: "Invalid order ID format" });
-    return;
+    throw new BadRequestError("Invalid order ID format");
   }
 
   const order = await prisma.order.findFirst({
@@ -283,7 +271,7 @@ export const getOrderById = async (req: Request, res: Response) => {
   });
 
   if (!order) {
-    throw { status: 404, message: "Order not found" };
+    throw new NotFoundError("Order not found");
   }
 
   res.status(200).json({
@@ -296,20 +284,12 @@ export const getOrderById = async (req: Request, res: Response) => {
 export const updateOrder = async (req: Request, res: Response) => {
   const validatedId = idSchema.safeParse(req.params.id);
   if (!validatedId.success) {
-    res
-      .status(400)
-      .json({ success: false, message: "Invalid order ID format" });
-    return;
+    throw new BadRequestError("Invalid order ID format");
   }
 
   const validatedData = orderSchema.safeParse(req.body);
   if (!validatedData.success) {
-    res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      error: validatedData.error.issues,
-    });
-    return;
+    throw new BadRequestError("Validation failed", validatedData.error.issues);
   }
 
   const id = validatedId.data;
@@ -319,8 +299,7 @@ export const updateOrder = async (req: Request, res: Response) => {
   });
 
   if (!order) {
-    res.status(404).json({ success: false, message: "Order not found" });
-    return;
+    throw new NotFoundError("Order not found");
   }
 
   // Only allow updating certain fields, e.g., status and paymentStatus
@@ -346,10 +325,7 @@ export const updateOrder = async (req: Request, res: Response) => {
 export const deleteOrder = async (req: Request, res: Response) => {
   const validatedData = idSchema.safeParse(req.params.id);
   if (!validatedData.success) {
-    res
-      .status(400)
-      .json({ success: false, message: "Invalid order ID format" });
-    return;
+    throw new BadRequestError("Invalid order ID format");
   }
 
   const order = await prisma.order.findFirst({
@@ -357,8 +333,7 @@ export const deleteOrder = async (req: Request, res: Response) => {
   });
 
   if (!order) {
-    res.status(404).json({ success: false, message: "Order not found" });
-    return;
+    throw new NotFoundError("Order not found");
   }
 
   await prisma.order.delete({
