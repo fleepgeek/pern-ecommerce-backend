@@ -16,7 +16,7 @@ model User {
   name                        String
   email                       String           @unique
   password                    String
-  role                        Role             @default(USER) // Default role is USER
+  roles                       UserRole[]
   isVerified                  Boolean          @default(false)
   verificationToken           String?
   verificationTokenExpiresAt  DateTime?
@@ -31,6 +31,22 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Role {
+  id    String     @id @default(cuid())
+  name  String     @unique
+  users UserRole[]
+}
+
+model UserRole {
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId String
+
+  @@id([userId, roleId]) // Composite primary key
 }
 
 model Product {
@@ -115,11 +131,6 @@ model ShippingAddress {
   updatedAt  DateTime @updatedAt
 
   @@index([userId])
-}
-
-enum Role {
-  USER
-  ADMIN
 }
 
 enum OrderStatus {

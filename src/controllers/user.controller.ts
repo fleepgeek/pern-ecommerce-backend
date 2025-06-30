@@ -74,7 +74,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       name: true,
       email: true,
       isVerified: true,
-      role: true,
+      roles: true,
       createdAt: true,
       shippingAddress: {
         select: {
@@ -125,6 +125,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
   const user = await prisma.user.findUnique({
     where: { id },
+    include: { roles: { include: { role: true } } },
   });
 
   if (!user) {
@@ -132,13 +133,13 @@ export const updateUser = async (req: Request, res: Response) => {
     return;
   }
 
-  if (user.id !== req.userId || user.role !== "ADMIN") {
-    res.status(403).json({
-      success: false,
-      message: "You dont have the permission to update this user",
-    });
-    return;
-  }
+  // if (user.id !== req.userId || user.roles.include(role => role ==="ADMIN") {
+  //   res.status(403).json({
+  //     success: false,
+  //     message: "You dont have the permission to update this user",
+  //   });
+  //   return;
+  // }
 
   const updatedUser = await prisma.user.update({
     where: { id },
@@ -167,6 +168,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 
   const user = await prisma.user.findUnique({
     where: { id },
+    include: { roles: { include: { role: true } } },
   });
 
   if (!user) {
@@ -179,7 +181,7 @@ export const deleteUser = async (req: Request, res: Response) => {
   });
 
   const isOwner = user.id === req.userId;
-  const isAdmin = user.role === "ADMIN";
+  const isAdmin = user.roles.some((role) => role.role.name === "ADMIN");
 
   if (!isOwner || !isAdmin) {
     res.status(403).json({

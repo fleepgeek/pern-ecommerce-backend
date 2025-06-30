@@ -62,9 +62,13 @@ export const authenticate = async (
 
 export const authorize = (allowedRoles: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const user = await prisma.user.findFirst({ where: { id: req.userId } });
+    const user = await prisma.user.findFirst({
+      where: { id: req.userId },
+      include: { roles: { include: { role: true } } },
+    });
 
-    if (!allowedRoles.includes(user!.role)) {
+    // if (!allowedRoles.includes(user!.role)) {
+    if (!user!.roles.some((role) => allowedRoles.includes(role.role.name))) {
       res.status(403).json({
         success: false,
         message: "Access denied",

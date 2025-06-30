@@ -19,6 +19,8 @@ import {
   sendWelcomeEmail,
 } from "../utils/sendmail";
 
+const DEFAULT_ROLE = "USER";
+
 export const signUp = async (req: Request, res: Response) => {
   const validatedData = signupSchema.safeParse(req.body);
   if (!validatedData.success) {
@@ -52,11 +54,21 @@ export const signUp = async (req: Request, res: Response) => {
         Date.now() + 24 * 60 * 60 * 1000
       ); // expires in 24hrs
 
+      let defaultRole = await tx.role.findUnique({
+        where: { name: DEFAULT_ROLE },
+      });
+      if (!defaultRole) {
+        defaultRole = await tx.role.create({ data: { name: DEFAULT_ROLE } });
+      }
+
       const user = await tx.user.create({
         data: {
           email,
           password: hashedPassword,
           name,
+          roles: {
+            create: { roleId: defaultRole.id },
+          },
           verificationToken,
           verificationTokenExpiresAt,
         },
