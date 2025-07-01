@@ -52,6 +52,15 @@ const errorHandler = (
     return;
   }
 
+  if (err instanceof AppError) {
+    console.log(err);
+    res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+    });
+    return;
+  }
+
   // Generic error handler
   console.error("Unhandled error:", err);
   res.status(err.status || 500).json({

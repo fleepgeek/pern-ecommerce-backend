@@ -34,23 +34,160 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 export const getProducts = async (req: Request, res: Response) => {
-  const products = await prisma.product.findMany({
-    include: {
-      media: {
-        select: {
-          id: true,
-          url: true,
-          isDefault: true,
-        },
-      },
-    },
-  });
+  const pageSize = parseInt(req.query.pageSize as string) || 10;
+  const page = parseInt(req.query.page as string) || 1;
+  const skip = (page - 1) * pageSize;
 
-  res.status(200).json({
-    success: true,
-    message: "Products fetched succefully",
-    data: { products },
-  });
+  const sortBy = (req.query.sortBy as string) || "createdAt";
+  const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
+
+  const filters: any = {};
+
+  filters.isPublished = true; // Default to published products for non-admin users
+
+  if (req.query.category) filters.categoryId = req.query.category;
+  if (req.query.minPrice) filters.price = { gte: Number(req.query.minPrice) };
+  if (req.query.maxPrice) {
+    filters.price = { ...filters.price, lte: Number(req.query.maxPrice) };
+  }
+
+  // Search
+  if (req.query.searchQuery) {
+    filters.OR = [
+      { name: { contains: req.query.searchQuery as string } },
+      { description: { contains: req.query.searchQuery as string } },
+    ];
+  }
+
+  try {
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: filters,
+        skip: skip,
+        take: pageSize,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          media: {
+            select: {
+              id: true,
+              url: true,
+              isDefault: true,
+            },
+          },
+        },
+      }),
+      prisma.product.count({ where: filters }),
+    ]);
+
+    if (!total) {
+      res.status(404).json({
+        success: false,
+        message: "No products found",
+        data: {
+          pagingInfo: {
+            total: 0,
+            page: 1,
+            pages: 1,
+          },
+          products: [],
+        },
+      });
+      return;
+    }
+
+    const pages = Math.ceil(total / pageSize);
+
+    res.status(200).json({
+      success: true,
+      message: "Products fetched succefully",
+      data: {
+        pagingInfo: { total, page, pages },
+        products,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server error" });
+  }
+};
+
+export const getProductsForAdmin = async (req: Request, res: Response) => {
+  const pageSize = parseInt(req.query.pageSize as string) || 10;
+  const page = parseInt(req.query.page as string) || 1;
+  const skip = (page - 1) * pageSize;
+
+  const sortBy = (req.query.sortBy as string) || "createdAt";
+  const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
+
+  const filters: any = {};
+
+  // Admin can view all products, published or not
+  if (req.query.isPublished)
+    filters.isPublished = req.query.isPublished === "true";
+  if (req.query.category) filters.categoryId = req.query.category;
+  if (req.query.minPrice) filters.price = { gte: Number(req.query.minPrice) };
+  if (req.query.maxPrice) {
+    filters.price = { ...filters.price, lte: Number(req.query.maxPrice) };
+  }
+
+  // Search
+  if (req.query.searchQuery) {
+    filters.OR = [
+      { name: { contains: req.query.searchQuery as string } },
+      { description: { contains: req.query.searchQuery as string } },
+    ];
+  }
+
+  try {
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: filters,
+        skip: skip,
+        take: pageSize,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          media: {
+            select: {
+              id: true,
+              url: true,
+              isDefault: true,
+            },
+          },
+        },
+      }),
+      prisma.product.count({ where: filters }),
+    ]);
+
+    if (!total) {
+      res.status(404).json({
+        success: false,
+        message: "No products found",
+        data: {
+          pagingInfo: {
+            total: 0,
+            page: 1,
+            pages: 1,
+          },
+          products: [],
+        },
+      });
+      return;
+    }
+
+    const pages = Math.ceil(total / pageSize);
+
+    res.status(200).json({
+      success: true,
+      message: "Products fetched succefully",
+      data: {
+        pagingInfo: { total, page, pages },
+        products,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server error" });
+  }
 };
 
 export const getProductById = async (req: Request, res: Response) => {

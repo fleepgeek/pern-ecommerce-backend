@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getProducts,
+  getProductsForAdmin,
   getProductById,
   createProduct,
   updateProduct,
@@ -8,12 +9,12 @@ import {
 } from "../controllers/product.controller";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import mediaRoutes from "./media.route";
-import { Role } from "../../generated/prisma";
 
 const router = Router();
 
 router.get("/", getProducts);
-router.post("/", authenticate, authorize(["ADMIN"]), createProduct); // TODO: Make only for admin access
+router.post("/", authenticate, authorize(["ADMIN"]), createProduct);
+router.get("/admin", authenticate, authorize(["ADMIN"]), getProductsForAdmin);
 
 router.get("/:id", getProductById);
 router.patch("/:id", authenticate, authorize(["ADMIN"]), updateProduct);
