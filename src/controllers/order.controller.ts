@@ -1,13 +1,20 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
 import prisma from "../utils/db";
-import { idSchema, cartSchema, orderSchema } from "../utils/validations";
+import {
+  idSchema,
+  cartSchema,
+  orderSchema,
+  orderQuerySchema,
+  currentUserOrderQuerySchema,
+} from "../utils/validations";
 import { OrderStatus, PaymentStatus } from "../../generated/prisma";
 import {
   AppError,
   BadRequestError,
   NotFoundError,
 } from "../middlewares/error.middleware";
+import z3, { z } from "zod";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
@@ -176,43 +183,133 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
 };
 
 export const getOrders = async (req: Request, res: Response) => {
-  const orders = await prisma.order.findMany({
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      shippingAddress: true,
-      cartItems: {
+  const validatedData = orderQuerySchema.safeParse(req.query);
+  if (!validatedData.success) {
+    throw new BadRequestError(
+      "Invalid query parameters",
+      validatedData.error.issues
+    );
+  }
+
+  const {
+    pageSize,
+    page,
+    sortBy,
+    sortOrder,
+    status,
+    paymentStatus,
+    searchQuery,
+  } = validatedData.data;
+
+  const filter: any = {};
+
+  if (status) filter.status = status;
+  if (paymentStatus) filter.paymentStatus = paymentStatus;
+
+  // Search
+  if (searchQuery) {
+    filter.OR = [
+      { user: { name: { contains: searchQuery } } },
+      { user: { email: { contains: searchQuery } } },
+    ];
+  }
+
+  const skip = (page - 1) * pageSize;
+
+  try {
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: filter,
+        skip: skip,
+        take: pageSize,
+        orderBy: { [sortBy]: sortOrder },
         include: {
-          product: {
+          user: {
             select: {
               id: true,
               name: true,
-              price: true,
+              email: true,
+            },
+          },
+          shippingAddress: {
+            select: {
+              address: true,
+              state: true,
+              country: true,
+              postalCode: true,
+            },
+          },
+          cartItems: {
+            select: {
+              id: true,
+              orderId: true,
+              productId: true,
+              quantity: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                },
+              },
             },
           },
         },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      }),
+      prisma.order.count({ where: filter }),
+    ]);
 
-  res.status(200).json({
-    success: true,
-    message: "Orders successfully retrieved",
-    data: { orders },
-  });
+    if (!total) {
+      res.status(404).json({
+        success: false,
+        message: "No orders found",
+        data: {
+          pagingInfo: {
+            total: 0,
+            page: 1,
+            pages: 1,
+          },
+          orders: [],
+        },
+      });
+      return;
+    }
+
+    const pages = Math.ceil(total / pageSize);
+
+    res.status(200).json({
+      success: true,
+      message: "Orders successfully retrieved",
+      data: {
+        pagingInfo: { total, page, pages },
+        orders,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server error" });
+  }
 };
 
 export const getCurrentUserOrders = async (req: Request, res: Response) => {
+  const validatedData = currentUserOrderQuerySchema.safeParse(req.query);
+  if (!validatedData.success) {
+    throw new BadRequestError(
+      "Invalid query parameters",
+      validatedData.error.issues
+    );
+  }
+  const { pageSize, cursor } = validatedData.data;
+
   const orders = await prisma.order.findMany({
     where: { userId: req.userId },
+    take: pageSize + 1, // take extra 1 to know if theres a next item
+    ...(cursor && {
+      cursor: { id: cursor },
+      skip: 1, // skip the cursor
+    }),
+    // composite cursor ordering in case more than one orders have the same timestamp
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: {
       shippingAddress: true,
       cartItems: {
@@ -227,15 +324,39 @@ export const getCurrentUserOrders = async (req: Request, res: Response) => {
         },
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
   });
+
+  if (orders.length === 0) {
+    res.status(404).json({
+      success: false,
+      message: "No orders found",
+      data: {
+        cursorInfo: {
+          nextCursor: null,
+          pageSize,
+        },
+        orders: [],
+      },
+    });
+    return;
+  }
+
+  let nextCursor: string | null = null;
+  let paginatedOrders = orders;
+
+  if (orders.length > pageSize) {
+    // Set nextCursor to the last item of the current page (not the extra one)
+    nextCursor = orders[pageSize - 1].id;
+    paginatedOrders = orders.slice(0, pageSize); // Remove the extra order
+  }
 
   res.status(200).json({
     success: true,
     message: "User orders successfully retrieved",
-    data: { orders },
+    data: {
+      cursorInfo: { pageSize, nextCursor },
+      orders: paginatedOrders,
+    },
   });
 };
 

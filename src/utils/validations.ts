@@ -1,3 +1,4 @@
+import { parse } from "path";
 import { z } from "zod";
 
 export const idSchema = z.string().cuid();
@@ -122,3 +123,69 @@ export const orderSchema = z
       // path: ["status", "paymentStatus"],
     }
   );
+
+export const productQuerySchema = z.object({
+  pageSize: z
+    .string()
+    .regex(/^\d+$/)
+    .transform((val) => parseInt(val))
+    .default("1"),
+  page: z
+    .string()
+    .regex(/^\d+$/)
+    .transform((val) => parseInt(val))
+    .default("1"),
+  sortBy: z
+    .enum(["createdAt", "updatedAt", "name", "price"])
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+  isPublished: z
+    .string()
+    .transform((val) => {
+      if (val === "true") {
+        return true;
+      } else if (val === "false") {
+        return false;
+      } else {
+        return undefined;
+      }
+    })
+    .optional(),
+  category: z.string().cuid().optional(),
+  minPrice: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .optional(),
+  maxPrice: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .optional(),
+  searchQuery: z.string().optional(),
+});
+
+export const orderQuerySchema = z.object({
+  pageSize: z
+    .string()
+    .regex(/^\d+$/)
+    .transform((val) => parseInt(val))
+    .default("1"),
+  page: z
+    .string()
+    .regex(/^\d+$/)
+    .transform((val) => parseInt(val))
+    .default("1"),
+  sortBy: z
+    .enum(["createdAt", "updatedAt", "totalAmount"])
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+  status: z
+    .enum(["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"])
+    .optional(),
+  paymentStatus: z.enum(["PENDING", "PAID", "FAILED", "REFUNDED"]).optional(),
+  searchQuery: z.string().optional(),
+});
+
+export const currentUserOrderQuerySchema = z.object({
+  pageSize: z.string().default("2").transform(Number),
+  cursor: z.string().cuid().optional(),
+});

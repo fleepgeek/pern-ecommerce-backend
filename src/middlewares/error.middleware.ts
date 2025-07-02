@@ -98,9 +98,9 @@ export class NotFoundError extends AppError {
 
 export class BadRequestError extends AppError {
   details?: any;
-  constructor(message?: string, details?: any) {
-    super((message = "Validation failed"), 400);
-    if (this.details) this.details = details;
+  constructor(message = "Validation failed", details?: any) {
+    super(message, 400);
+    this.details = details;
     Object.setPrototypeOf(this, BadRequestError.prototype);
   }
 }

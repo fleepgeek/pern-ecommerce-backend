@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import prisma from "../utils/db";
-import { idSchema, productSchema } from "../utils/validations";
+import {
+  idSchema,
+  productQuerySchema,
+  productSchema,
+} from "../utils/validations";
 import {
   BadRequestError,
   NotFoundError,
@@ -34,30 +38,45 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 export const getProducts = async (req: Request, res: Response) => {
-  const pageSize = parseInt(req.query.pageSize as string) || 10;
-  const page = parseInt(req.query.page as string) || 1;
-  const skip = (page - 1) * pageSize;
+  const validatedData = productQuerySchema.safeParse(req.query);
 
-  const sortBy = (req.query.sortBy as string) || "createdAt";
-  const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
+  if (!validatedData.success) {
+    throw new BadRequestError(
+      "Invalid query parameters",
+      validatedData.error.issues
+    );
+  }
+
+  const {
+    pageSize,
+    page,
+    sortBy,
+    sortOrder,
+    category,
+    maxPrice,
+    minPrice,
+    searchQuery,
+  } = validatedData.data;
 
   const filters: any = {};
 
   filters.isPublished = true; // Default to published products for non-admin users
 
-  if (req.query.category) filters.categoryId = req.query.category;
-  if (req.query.minPrice) filters.price = { gte: Number(req.query.minPrice) };
-  if (req.query.maxPrice) {
-    filters.price = { ...filters.price, lte: Number(req.query.maxPrice) };
+  if (category) filters.categoryId = category;
+  if (minPrice) filters.price = { gte: minPrice };
+  if (maxPrice) {
+    filters.price = { ...filters.price, lte: maxPrice };
   }
 
   // Search
-  if (req.query.searchQuery) {
+  if (searchQuery) {
     filters.OR = [
-      { name: { contains: req.query.searchQuery as string } },
-      { description: { contains: req.query.searchQuery as string } },
+      { name: { contains: searchQuery } },
+      { description: { contains: searchQuery } },
     ];
   }
+
+  const skip = (page - 1) * pageSize;
 
   try {
     const [products, total] = await Promise.all([
@@ -112,31 +131,47 @@ export const getProducts = async (req: Request, res: Response) => {
 };
 
 export const getProductsForAdmin = async (req: Request, res: Response) => {
-  const pageSize = parseInt(req.query.pageSize as string) || 10;
-  const page = parseInt(req.query.page as string) || 1;
-  const skip = (page - 1) * pageSize;
+  const validatedData = productQuerySchema.safeParse(req.query);
 
-  const sortBy = (req.query.sortBy as string) || "createdAt";
-  const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
+  if (!validatedData.success) {
+    throw new BadRequestError(
+      "Invalid query parameters",
+      validatedData.error.issues
+    );
+  }
+
+  const {
+    pageSize,
+    page,
+    sortBy,
+    sortOrder,
+    isPublished,
+    category,
+    maxPrice,
+    minPrice,
+    searchQuery,
+  } = validatedData.data;
 
   const filters: any = {};
 
   // Admin can view all products, published or not
-  if (req.query.isPublished)
-    filters.isPublished = req.query.isPublished === "true";
-  if (req.query.category) filters.categoryId = req.query.category;
-  if (req.query.minPrice) filters.price = { gte: Number(req.query.minPrice) };
-  if (req.query.maxPrice) {
-    filters.price = { ...filters.price, lte: Number(req.query.maxPrice) };
+  if (isPublished !== undefined) filters.isPublished = isPublished;
+
+  if (category) filters.categoryId = category;
+  if (minPrice) filters.price = { gte: minPrice };
+  if (maxPrice) {
+    filters.price = { ...filters.price, lte: maxPrice };
   }
 
   // Search
-  if (req.query.searchQuery) {
+  if (searchQuery) {
     filters.OR = [
-      { name: { contains: req.query.searchQuery as string } },
-      { description: { contains: req.query.searchQuery as string } },
+      { name: { contains: searchQuery } },
+      { description: { contains: searchQuery } },
     ];
   }
+
+  const skip = (page - 1) * pageSize;
 
   try {
     const [products, total] = await Promise.all([
