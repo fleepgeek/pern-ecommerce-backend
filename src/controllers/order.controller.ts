@@ -272,7 +272,18 @@ export const updateOrder = async (req: Request, res: Response) => {
       ...(status && { status }),
       ...(paymentStatus && { paymentStatus }),
     },
+    include: { user: { select: { id: true, email: true, name: true } } },
   });
+
+  // if (status !== order.status) {
+  //   // If the status is updated, send an email notification
+  //   await sendOrderStatusUpdateEmail(
+  //     updatedOrder.user.email,
+  //     updatedOrder.user.name,
+  //     updatedOrder.id,
+  //     updatedOrder.status
+  //   );
+  // }
 
   res.status(200).json({
     success: true,
