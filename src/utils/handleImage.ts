@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 
-const folder = "mern_ecommerce";
+const folder = "PERN_ecommerce";
 
 export const uploadImageToCloud = async (imageFile: Express.Multer.File) => {
   const base64Image = imageFile.buffer.toString("base64");
