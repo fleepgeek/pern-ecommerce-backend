@@ -11,6 +11,7 @@ This is the backend for a PERN stack e-commerce application. It provides RESTful
 - Zod for validation
 - Cloudinary for Images
 - Stripe for payments
+- Nodemailer for emails
 
 ## Features
 
@@ -18,6 +19,9 @@ This is the backend for a PERN stack e-commerce application. It provides RESTful
 
   - Register and login with JWT-based authentication via cookies
   - Role-based access (admin/user)
+  - Verify Email
+  - Change Password
+  - Forgot password
 
 - **User Profile**
 
@@ -41,9 +45,14 @@ This is the backend for a PERN stack e-commerce application. It provides RESTful
   - Webhook support for fulfilling orders
 
 - **API Security**
+
   - Protected routes with JWT
   - Input validation with Zod and error handling
   - Rate limiting
+
+- **Email Notifications**
+  - Authentication related emails
+  - Send order confirmation and status update emails to users
 
 ## Getting Started
 
@@ -56,3 +65,4 @@ This is the backend for a PERN stack e-commerce application. It provides RESTful
 
 - Delete Media and images from Cloudinary for deleted products (CRON Job for bulk delete)
 - Offload sending emails to background job
+- Admin email notification for new orders
