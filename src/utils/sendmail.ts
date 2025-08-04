@@ -17,6 +17,7 @@ export const sendVerificationEmail = async (
       html: `
       <p>Hello ${name}</p>
       <b>Click the following link to verify your email address: <a href="${verifcationURL}">Verify Email</a></b>
+      <p>If you did not create an account, you can ignore this message.</p>
       `, // html body
     });
 

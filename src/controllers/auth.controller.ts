@@ -84,7 +84,7 @@ export const signUp = async (req: Request, res: Response) => {
     return user;
   });
 
-  generateAccessTokenAndSetCookie(res, result.id);
+  // generateAccessTokenAndSetCookie(res, result.id);
 
   await sendVerificationEmail(
     result.email,
@@ -117,9 +117,15 @@ export const login = async (req: Request, res: Response) => {
     throw new NotFoundError("Incorrect email or password");
   }
 
+  if (!user.isVerified) {
+    throw new BadRequestError(
+      "User is not verified. Please check your email for your verification link."
+    );
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    throw new BadRequestError("Incorrect email or passwordd");
+    throw new BadRequestError("Incorrect email or password");
   }
 
   generateAccessTokenAndSetCookie(res, user.id);
@@ -133,13 +139,17 @@ export const login = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
   res.clearCookie("token");
+  // res.cookie("token", "", {
+  //   httpOnly: true,
+  //   expires: new Date(0),
+  // });
   res.status(200).json({ success: true, message: "Logout successful" });
 };
 
 export const checkAuth = async (req: Request, res: Response) => {
-  if (!req.userId) {
-    throw new AuthenticationError("User not authenticated");
-  }
+  // if (!req.userId) {
+  //   throw new AuthenticationError("User not authenticated");
+  // }
 
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
@@ -205,7 +215,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
   res.status(200).json({
     success: true,
-    message: "Account Verification Successful",
+    message: "Account Verification Successful. You can login now",
     data: { user: updatedUser },
   });
 };
@@ -256,7 +266,7 @@ export const resendVerifyEmail = async (req: Request, res: Response) => {
 
   res.status(200).json({
     success: true,
-    message: "Verification email resent successfully",
+    message: "Verification email resent successfully. Check your mail.",
   });
 };
 
@@ -388,8 +398,6 @@ export const resetPassword = async (req: Request, res: Response) => {
       passwordResetTokenExpiresAt: null,
     },
   });
-
-  generateAccessTokenAndSetCookie(res, user.id);
 
   await sendPasswordChangedEmail(user!.email, user!.name);
 
