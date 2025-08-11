@@ -73,7 +73,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       name: true,
       email: true,
       isVerified: true,
-      roles: true,
+      roles: { include: { role: true } },
       createdAt: true,
       shippingAddress: {
         select: {
@@ -93,7 +93,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
   res.status(200).json({
     success: true,
-    message: "User fetched succefully",
+    message: "User fetched successfully",
     data: { user },
   });
 };
