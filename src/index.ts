@@ -44,8 +44,10 @@ app.get("/", (req: Request, res: Response) => {
   res.send({ success: true, message: "Welcome to PERN COMMERCE API" });
 });
 
-app.use("/v1/api/auth", authLimiter, authRouter);
-app.use("/v1/api/user", authLimiter, userRouter);
+// app.use("/v1/api/auth", authLimiter, authRouter);
+// app.use("/v1/api/user", authLimiter, userRouter);
+app.use("/v1/api/auth", authRouter);
+app.use("/v1/api/user", userRouter);
 app.use("/v1/api/product", productRouter);
 app.use("/v1/api/order", orderRouter);
 

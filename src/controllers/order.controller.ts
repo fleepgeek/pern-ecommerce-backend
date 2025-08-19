@@ -214,7 +214,7 @@ export const getOrders = async (req: Request, res: Response) => {
     ];
   }
 
-  const skip = (page - 1) * pageSize;
+  const skip = pageSize ? (page - 1) * pageSize : 0;
 
   try {
     const [orders, total] = await Promise.all([
@@ -275,7 +275,7 @@ export const getOrders = async (req: Request, res: Response) => {
       return;
     }
 
-    const pages = Math.ceil(total / pageSize);
+    const pages = pageSize ? Math.ceil(total / pageSize) : 1;
 
     res.status(200).json({
       success: true,

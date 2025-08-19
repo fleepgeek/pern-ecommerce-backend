@@ -151,7 +151,7 @@ export const getProductsForAdmin = async (req: Request, res: Response) => {
     minPrice,
     searchQuery,
   } = validatedData.data;
-  console.log(pageSize);
+
   const filters: any = {};
 
   // Admin can view all products, published or not
