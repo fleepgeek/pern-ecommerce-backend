@@ -25,8 +25,8 @@ export const createProduct = async (req: Request, res: Response) => {
       description,
       price,
       isPublished,
-      categoryId,
       userId: req.userId,
+      ...(categoryId ? { categoryId } : {}),
     },
   });
 
@@ -48,7 +48,7 @@ export const getProducts = async (req: Request, res: Response) => {
   }
 
   const {
-    pageSize,
+    pageSize = 10, // Default page size
     page,
     sortBy,
     sortOrder,
@@ -151,7 +151,7 @@ export const getProductsForAdmin = async (req: Request, res: Response) => {
     minPrice,
     searchQuery,
   } = validatedData.data;
-
+  console.log(pageSize);
   const filters: any = {};
 
   // Admin can view all products, published or not
@@ -171,14 +171,15 @@ export const getProductsForAdmin = async (req: Request, res: Response) => {
     ];
   }
 
-  const skip = (page - 1) * pageSize;
+  // const skip = (page - 1) * pageSize;
+  const skip = pageSize ? (page - 1) * pageSize : 0;
 
   try {
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where: filters,
         skip: skip,
-        take: pageSize,
+        take: pageSize || undefined,
         orderBy: { [sortBy]: sortOrder },
         include: {
           media: {
@@ -187,6 +188,9 @@ export const getProductsForAdmin = async (req: Request, res: Response) => {
               url: true,
               isDefault: true,
             },
+          },
+          category: {
+            select: { name: true },
           },
         },
       }),
@@ -209,7 +213,8 @@ export const getProductsForAdmin = async (req: Request, res: Response) => {
       return;
     }
 
-    const pages = Math.ceil(total / pageSize);
+    // const pages = Math.ceil(total / pageSize);
+    const pages = pageSize ? Math.ceil(total / pageSize) : 1;
 
     res.status(200).json({
       success: true,
@@ -303,5 +308,15 @@ export const deleteProduct = async (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
     message: "Product deleted successfully",
+  });
+};
+
+export const getCategories = async (req: Request, res: Response) => {
+  const categories = await prisma.category.findMany();
+
+  res.status(200).json({
+    success: true,
+    mesaage: "Categories fetched successfully.",
+    data: { categories },
   });
 };

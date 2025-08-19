@@ -6,6 +6,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  getCategories,
 } from "../controllers/product.controller";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import mediaRoutes from "./media.route";
@@ -15,6 +16,7 @@ const router = Router();
 router.get("/", getProducts);
 router.post("/", authenticate, authorize(["ADMIN"]), createProduct);
 router.get("/admin", authenticate, authorize(["ADMIN"]), getProductsForAdmin);
+router.get("/category", getCategories);
 
 router.get("/:id", getProductById);
 router.patch("/:id", authenticate, authorize(["ADMIN"]), updateProduct);

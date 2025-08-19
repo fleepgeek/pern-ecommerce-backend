@@ -417,6 +417,15 @@ export const updateOrder = async (req: Request, res: Response) => {
 
   const order = await prisma.order.findFirst({
     where: { id },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 
   if (!order) {

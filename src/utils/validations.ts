@@ -128,8 +128,10 @@ export const productQuerySchema = z.object({
   pageSize: z
     .string()
     .regex(/^\d+$/)
+    // .regex(/^-?\d+$/)
     .transform((val) => parseInt(val))
-    .default("1"),
+    .optional(),
+  // .default("1"),
   page: z
     .string()
     .regex(/^\d+$/)
