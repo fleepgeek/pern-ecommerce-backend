@@ -273,6 +273,7 @@ export const updateProduct = async (req: Request, res: Response) => {
   }
 
   const id = validatedId.data;
+  const { categoryId } = validatedData.data;
 
   const product = await prisma.product.findFirst({ where: { id } });
   if (!product) {
@@ -281,7 +282,10 @@ export const updateProduct = async (req: Request, res: Response) => {
 
   const updatedProduct = await prisma.product.update({
     where: { id },
-    data: validatedData.data,
+    data: {
+      ...validatedData.data,
+      ...(categoryId ? { categoryId } : { categoryId: undefined }), // since category can be null
+    },
   });
 
   res.status(200).json({

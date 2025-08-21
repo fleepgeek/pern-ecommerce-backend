@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../utils/db";
 import { deleteImageFromCloud, uploadImageToCloud } from "../utils/handleImage";
-import { mediaSchema } from "../utils/validations";
+import { idSchema, mediaSchema } from "../utils/validations";
 import { Prisma } from "../../generated/prisma";
 import {
   BadRequestError,
@@ -9,21 +9,27 @@ import {
 } from "../middlewares/error.middleware";
 
 export const addMediaToProduct = async (req: Request, res: Response) => {
+  const validatedId = idSchema.safeParse(req.params.productId);
+  if (!validatedId.success) {
+    throw new BadRequestError("Invalid product ID format");
+  }
+  const productId = validatedId.data;
+
   const validatedData = mediaSchema.safeParse(req.files);
   if (!validatedData.success) {
     throw new BadRequestError("Validation failed", validatedData.error.issues);
   }
 
-  const photos = validatedData.data;
-  const { productId } = req.params;
-
   const product = await prisma.product.findFirst({
     where: { id: productId },
     include: { media: { select: { id: true } } },
   });
+
   if (!product) {
     throw new NotFoundError("Product not found");
   }
+
+  const photos = validatedData.data;
 
   const imageUrls = await Promise.all(
     photos.map((photo) => uploadImageToCloud(photo as Express.Multer.File))
@@ -57,7 +63,15 @@ export const addMediaToProduct = async (req: Request, res: Response) => {
 };
 
 export const deleteMediaFromProduct = async (req: Request, res: Response) => {
-  const { productId, mediaId } = req.params;
+  const validatedProductId = idSchema.safeParse(req.params.productId);
+  const validatedMediaId = idSchema.safeParse(req.params.mediaId);
+  if (!validatedProductId.success || !validatedMediaId.success) {
+    throw new BadRequestError("Invalid product or media ID format");
+  }
+
+  const productId = validatedProductId.data;
+  const mediaId = validatedMediaId.data;
+
   const media = await prisma.media.findFirst({
     where: { id: mediaId, productId },
     include: { product: { select: { media: true } } },
@@ -94,7 +108,15 @@ export const updateDefaultMediaForProduct = async (
   req: Request,
   res: Response
 ) => {
-  const { productId, mediaId } = req.params;
+  const validatedProductId = idSchema.safeParse(req.params.productId);
+  const validatedMediaId = idSchema.safeParse(req.params.mediaId);
+  if (!validatedProductId.success || !validatedMediaId.success) {
+    throw new BadRequestError("Invalid product or media ID format");
+  }
+
+  const productId = validatedProductId.data;
+  const mediaId = validatedMediaId.data;
+
   const result = await prisma.$transaction(async (tx) => {
     const media = await tx.media.findFirst({
       where: { id: mediaId, productId },
@@ -121,6 +143,6 @@ export const updateDefaultMediaForProduct = async (
   res.status(200).json({
     success: true,
     message: "Product's Default Media Succcefuly Updated",
-    data: { updatedMedia: result },
+    data: { media: result },
   });
 };

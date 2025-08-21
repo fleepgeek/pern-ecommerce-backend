@@ -12,7 +12,7 @@ export const uploadImageToCloud = async (imageFile: Express.Multer.File) => {
 export const deleteImageFromCloud = async (imageUrl: String) => {
   const pathArray = imageUrl.split("/");
   const name = pathArray[pathArray.length - 1].split(".")[0];
-  const publicId = `${folder}/${name}ddd`;
+  const publicId = `${folder}/${name}`;
   await cloudinary.uploader.destroy(publicId, {
     invalidate: true,
   });

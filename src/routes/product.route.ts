@@ -22,6 +22,6 @@ router.get("/:id", getProductById);
 router.patch("/:id", authenticate, authorize(["ADMIN"]), updateProduct);
 router.delete("/:id", authenticate, authorize(["ADMIN"]), deleteProduct);
 
-router.use("/:productId/media", authorize(["ADMIN"]), mediaRoutes);
+router.use("", authorize(["ADMIN"]), mediaRoutes);
 
 export default router;
