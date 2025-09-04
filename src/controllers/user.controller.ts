@@ -120,6 +120,7 @@ export const updateUser = async (req: Request, res: Response) => {
     throw new NotFoundError("User not found");
   }
 
+  // TODO: Move isOwnerOrAdmin into separate middlewares cos is used in multiple places
   const loggedInUser = await prisma.user.findFirst({
     where: { id: req.userId },
     include: { roles: { include: { role: true } } },
@@ -189,6 +190,9 @@ export const deleteUser = async (req: Request, res: Response) => {
       403
     );
   }
+
+  // TODO: Ask to verify password if isOwner
+  // and send mail with deletion link
 
   await prisma.user.delete({
     where: { id },

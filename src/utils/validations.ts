@@ -189,6 +189,9 @@ export const orderQuerySchema = z.object({
 });
 
 export const currentUserOrderQuerySchema = z.object({
-  pageSize: z.string().default("2").transform(Number),
+  pageSize: z.string().default("10").transform(Number),
   cursor: z.string().cuid().optional(),
+  status: z
+    .enum(["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"])
+    .optional(),
 });

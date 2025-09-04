@@ -7,6 +7,7 @@ import authRouter from "./routes/auth.route";
 import userRouter from "./routes/user.route";
 import productRouter from "./routes/product.route";
 import orderRouter from "./routes/order.route";
+import paymentRouter from "./routes/payment.route";
 import { authenticate } from "./middlewares/auth.middleware";
 import rateLimiter, { authLimiter } from "./middlewares/limiter.middleware";
 import configureCloudinary from "./config/cloudinary";
@@ -31,7 +32,7 @@ app.use(cors({ credentials: true, origin: process.env.FRONTEND_URL }));
 //   stripeWebHookHandler
 // );
 app.use(
-  "/v1/api/order/checkout/webhook",
+  "/v1/api/payment/checkout/webhook",
   express.raw({ type: "application/json" })
 );
 
@@ -50,6 +51,7 @@ app.use("/v1/api/auth", authRouter);
 app.use("/v1/api/user", userRouter);
 app.use("/v1/api/product", productRouter);
 app.use("/v1/api/order", orderRouter);
+app.use("/v1/api/payment", paymentRouter);
 
 app.get("/v1/api/protected", authenticate, (req: Request, res: Response) => {
   res.send({ success: true, message: "Protected api" });

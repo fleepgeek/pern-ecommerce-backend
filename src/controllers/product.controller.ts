@@ -86,6 +86,7 @@ export const getProducts = async (req: Request, res: Response) => {
         take: pageSize,
         orderBy: { [sortBy]: sortOrder },
         include: {
+          category: true,
           media: {
             select: {
               id: true,
@@ -240,6 +241,7 @@ export const getProductById = async (req: Request, res: Response) => {
   const product = await prisma.product.findFirst({
     where: { id },
     include: {
+      category: true,
       media: {
         select: {
           id: true,
