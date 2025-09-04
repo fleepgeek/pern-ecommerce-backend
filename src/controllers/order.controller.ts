@@ -10,6 +10,7 @@ import {
   BadRequestError,
   NotFoundError,
 } from "../middlewares/error.middleware";
+import { sendOrderStatusUpdateEmail } from "../utils/sendmail";
 
 export const getOrders = async (req: Request, res: Response) => {
   const validatedData = orderQuerySchema.safeParse(req.query);
@@ -275,15 +276,15 @@ export const updateOrder = async (req: Request, res: Response) => {
     include: { user: { select: { id: true, email: true, name: true } } },
   });
 
-  // if (status !== order.status) {
-  //   // If the status is updated, send an email notification
-  //   await sendOrderStatusUpdateEmail(
-  //     updatedOrder.user.email,
-  //     updatedOrder.user.name,
-  //     updatedOrder.id,
-  //     updatedOrder.status
-  //   );
-  // }
+  if (status !== order.status) {
+    // If the status is updated, send an email notification
+    await sendOrderStatusUpdateEmail(
+      updatedOrder.user.email,
+      updatedOrder.user.name,
+      updatedOrder.id,
+      updatedOrder.status
+    );
+  }
 
   res.status(200).json({
     success: true,

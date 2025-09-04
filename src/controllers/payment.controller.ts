@@ -9,6 +9,10 @@ import {
   BadRequestError,
   NotFoundError,
 } from "../middlewares/error.middleware";
+import {
+  sendOrderConfirmationEmail,
+  sendPaymentFailedEmail,
+} from "../utils/sendmail";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
@@ -137,14 +141,16 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
         order.paymentStatus !== PaymentStatus.PAID &&
         event.data.object.amount_total
       ) {
-        await prisma.order.update({
+        const updatedOrder = await prisma.order.update({
           where: { id: order.id },
           data: {
             totalAmount: event.data.object.amount_total / 100, // converting it back to usd from cents
             paymentStatus: PaymentStatus.PAID,
             status: OrderStatus.PAID,
           },
+          include: { user: true, cartItems: { include: { product: true } } },
         });
+        await sendOrderConfirmationEmail(updatedOrder);
       }
 
       break;
@@ -155,6 +161,7 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
 
       const order = await prisma.order.findFirst({
         where: { id: orderId },
+        include: { user: true },
       });
       if (!order) break;
 
@@ -165,6 +172,12 @@ export const stripeWebHookHandler = async (req: Request, res: Response) => {
             paymentStatus: PaymentStatus.FAILED,
           },
         });
+
+        await sendPaymentFailedEmail(
+          order.user.email,
+          order.user.name,
+          order.id
+        );
       }
 
       break;
