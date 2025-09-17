@@ -1,5 +1,10 @@
 import { Request, Response } from "express";
-import { shippingAddressSchema, userSchema } from "../utils/validations";
+import bcrypt from "bcryptjs";
+import {
+  deleteUserSchema,
+  shippingAddressSchema,
+  userSchema,
+} from "../utils/validations";
 import prisma from "../utils/db";
 import { idSchema } from "../utils/validations";
 import {
@@ -158,12 +163,16 @@ export const updateUser = async (req: Request, res: Response) => {
 };
 
 export const deleteUser = async (req: Request, res: Response) => {
-  const validatedId = idSchema.safeParse(req.params.id);
+  const validatedId = deleteUserSchema.safeParse({
+    id: req.params.id,
+    password: req.body?.password,
+  });
+
   if (!validatedId.success) {
-    throw new BadRequestError("Invalid user id");
+    throw new BadRequestError("Validation failed", validatedId.error.issues);
   }
 
-  const id = validatedId.data;
+  const { id, password } = validatedId.data;
 
   const user = await prisma.user.findUnique({
     where: { id },
@@ -191,8 +200,18 @@ export const deleteUser = async (req: Request, res: Response) => {
     );
   }
 
-  // TODO: Ask to verify password if isOwner
-  // and send mail with deletion link
+  if (isOwner) {
+    if (!password) {
+      throw new BadRequestError("Password is required to delete your account");
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      throw new AuthenticationError("Invalid password", 403);
+    }
+  }
 
   await prisma.user.delete({
     where: { id },

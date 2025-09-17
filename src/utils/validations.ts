@@ -45,6 +45,14 @@ export const resetPasswordSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
 });
 
+export const deleteUserSchema = z.object({
+  id: z.string().cuid(),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters long")
+    .optional(),
+});
+
 export const shippingAddressSchema = z.object({
   address: z.string().min(5, "Address must be at least 5 characters long"),
   state: z.string().min(2, "City must be at least 2 characters long"),
