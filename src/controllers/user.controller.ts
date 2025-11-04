@@ -47,6 +47,16 @@ export const getUserById = async (req: Request, res: Response) => {
       email: true,
       isVerified: true,
       createdAt: true,
+      updatedAt: true,
+      roles: {
+        select: {
+          role: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
       shippingAddress: {
         select: {
           id: true,
@@ -54,6 +64,11 @@ export const getUserById = async (req: Request, res: Response) => {
           state: true,
           country: true,
           postalCode: true,
+        },
+      },
+      orders: {
+        include: {
+          cartItems: true,
         },
       },
     },
